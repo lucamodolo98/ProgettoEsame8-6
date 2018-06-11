@@ -6,5 +6,8 @@
     <string name="DownloadInformation">Download Information</string>
     <string name="drawer_open">open</string>
     <string name="drawer_close">close</string>
+    <string name="city_name">Nome città:</string>
+    <string name="city_population">Popolazione:</string>
+    <string name="city_state">Stato:</string>
 
 </resources>

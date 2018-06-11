@@ -4,9 +4,6 @@ import android.Manifest;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.Context;
-import android.content.DialogInterface;
-import android.content.Intent;
-import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
@@ -23,9 +20,9 @@ import android.support.v4.app.ActionBarDrawerToggle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.DrawerLayout;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.util.Pair;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
@@ -34,19 +31,13 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.Cap;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -55,11 +46,11 @@ import com.google.android.gms.tasks.Task;
 import org.apache.commons.math3.geometry.euclidean.threed.Rotation;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
+import java.text.DecimalFormat;
 import java.text.MessageFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 
-import static android.content.Context.SENSOR_SERVICE;
 import static android.hardware.SensorManager.getOrientation;
 import static android.hardware.SensorManager.getRotationMatrix;
 
@@ -92,15 +83,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private double latitudine;
     private double longitudine;
     private ArrayDeque<Float> codaAzim = new ArrayDeque<>();
-    private final int MAX_NUM_AZIM = 25;
+    private final static int MAX_NUM_AZIM = 100;
     private static String TAG = MainActivity.class.getSimpleName();
     ListView mDrawerList;
     RelativeLayout mDrawerPane;
     private ActionBarDrawerToggle mDrawerToggle;
     private DrawerLayout mDrawerLayout;
 
-    ArrayList<NavItem> mNavItems = new ArrayList<NavItem>();
+    ArrayList<NavItem> mNavItems = new ArrayList<>();
     private Polyline line;
+    private DecimalFormat azimuthFormat = new DecimalFormat("#.###");
     private Citta citta_precedente = null;
 
 
@@ -109,12 +101,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        assert mSensorManager != null;
         mGravitySensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mGeomagneticSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         azimuthTv = findViewById(R.id.azimuth);
-        nome = (TextView) findViewById(R.id.nome);
-        stato = (TextView) findViewById(R.id.stato);
-        popolazione = (TextView) findViewById(R.id.popolazione);
+        nome = findViewById(R.id.nome);
+        stato = findViewById(R.id.stato);
+        popolazione = findViewById(R.id.popolazione);
         GPS = findViewById(R.id.GPS);
         locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
 
@@ -128,10 +121,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
         changeCities(MySQLiteHelper.COUNTRY_CODE_CAPITALI, this);
-        mDrawerLayout = (DrawerLayout) findViewById(R.id.drawerLayout);
+        mDrawerLayout = findViewById(R.id.drawerLayout);
 
-        mDrawerPane = (RelativeLayout) findViewById(R.id.drawerPane);
-        mDrawerList = (ListView) findViewById(R.id.navList);
+        mDrawerPane = findViewById(R.id.drawerPane);
+        mDrawerList = findViewById(R.id.navList);
         DrawerListAdapter adapter = new DrawerListAdapter(this, mNavItems, this);
         mDrawerList.setAdapter(adapter);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -205,10 +198,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (mDrawerToggle.onOptionsItemSelected(item)) {
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
+        return mDrawerToggle.onOptionsItemSelected(item) || super.onOptionsItemSelected(item);
     }
 
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
@@ -218,27 +208,24 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 } else {
                 }
-                return;
             }
         }
     }
 
-    public boolean checkLocationPermission() {
+    public void checkLocationPermission() {
         String permission = "android.permission.ACCESS_FINE_LOCATION";
         int res = this.checkCallingOrSelfPermission(permission);
-        return (res == PackageManager.PERMISSION_GRANTED);
     }
 
-    public boolean checkLocationPermission1() {
+    public void checkLocationPermission1() {
         String permission = "android.permission.ACCESS_COARSE_LOCATION";
         int res = this.checkCallingOrSelfPermission(permission);
-        return (res == PackageManager.PERMISSION_GRANTED);
     }
 
     protected void onResume() {
         super.onResume();
-        mSensorManager.registerListener(this, mGravitySensor, SensorManager.SENSOR_DELAY_UI);
-        mSensorManager.registerListener(this, mGeomagneticSensor, SensorManager.SENSOR_DELAY_UI);
+        mSensorManager.registerListener(this, mGravitySensor, SensorManager.SENSOR_DELAY_GAME);
+        mSensorManager.registerListener(this, mGeomagneticSensor, SensorManager.SENSOR_DELAY_GAME);
     }
 
     protected void onPause() {
@@ -286,17 +273,21 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             codaAzim.removeLast();
         }
 
-        azimuthTv.setText(String.valueOf(Math.toDegrees(getAzimuth())));
+        azimuthTv.setText(azimuthFormat.format(Math.toDegrees(getAzimuth())));
         updatePolyline();
 
     }
 
     public float getAzimuth() {
-        float sum = 0;
+        // Media aritmentica per valoci circolari
+        // https://en.wikipedia.org/wiki/Mean_of_circular_quantities
+        float sina = 0;
+        float cosa = 0;
         for (Float x : codaAzim) {
-            sum += x;
+            sina += Math.sin(x);
+            cosa += Math.cos(x);
         }
-        return sum / codaAzim.size();
+        return (float)Math.atan2(sina,cosa);
     }
 
     @Override
@@ -310,16 +301,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         double x = radius * Math.sin(lat) * Math.cos(longg);
         double y = radius * Math.sin(lat) * Math.cos(longg);
         double z = radius * Math.cos(lat);
-        Vector3D v3 = new Vector3D(x, y, z);
-        return v3;
+        return new Vector3D(x, y, z);
     }
 
-    public Citta findCity() {
+    public Pair<Citta, Float> findCity() {
         double azimuth = getAzimuth();
-        Vector3D earth = new Vector3D(0, 0, 0);
         Vector3D user = gps_to_xyz(latitudine, longitudine, 1);
-        double minAngle = Math.toRadians(500);
-        ArrayList<Citta> cittaValide = new ArrayList<>();
+        double minAngle = 1000;
         Citta city = null;
         for (Citta x : cities) {
             Vector3D cityPos = gps_to_xyz(x.getLatitudine(), x.getLongitudine(), 1);
@@ -329,20 +317,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Vector3D gloDir = quat_rot_long.applyTo(quat_rot_lat.applyTo(locPos));
             Vector3D normUser = Vector3D.crossProduct(user, cityPos);
             Vector3D normCity = Vector3D.crossProduct(user, gloDir);
-            double angle = Vector3D.angle(normUser, normCity);
+            double angle = Math.abs(Vector3D.angle(normUser, normCity));
+
+            //double sin = cityPos.crossProduct(locPos).getNorm()/(cityPos.getNorm()*locPos.getNorm());
+            //double cos = cityPos.dotProduct(locPos)/(cityPos.getNorm()*locPos.getNorm());
+            //double angularDistance = Math.atan2(sin, cos);
             if (angle < minAngle) {
                 minAngle = angle;
                 city = x;
-                //cittaValide.add(x);
             }
         }
-        //cittaValide.sort(new Comparator<Citta>() {
-        //@Override
-        //public int compare(Citta o1, Citta o2) {
-        //return o1.getPopolazione() - o2.getPopolazione();
-        //  }
-        //});
-        return city;
+        return new Pair<>(city, (float)minAngle);
     }
 
 
@@ -445,20 +430,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void updatePolyline() {
-        Citta citta = findCity();
-//        if(citta != null) {
-//
-//            Log.d("CITTA", citta.toString());
-//        }
+        Pair<Citta, Float> citta_angolo = findCity();
+        Citta citta = citta_angolo.first;
         if (citta != null && mMap != null && (citta_precedente == null || citta.getIdCitta() != citta_precedente.getIdCitta())) {
             Log.d("CITTA", citta.toString());
             citta_precedente = citta;
             if (line != null) {
                 line.remove();
             }
-            nome.setText("Nome città : " + citta.getNomeCitta());
-            popolazione.setText("Popolazione : " + citta.getPopolazione());
-            stato.setText("Stato : " + getStato(citta.NomeCitta));
+            nome.setText(MessageFormat.format("{0} {1}", getString(R.string.city_name), citta.getNomeCitta()));
+            popolazione.setText(MessageFormat.format("{0} {1}", getString(R.string.city_population), citta.getPopolazione()));
+            stato.setText(MessageFormat.format("{0} {1}", getString(R.string.city_state), getStato(citta.NomeCitta)));
             LatLng startPoint = new LatLng(latitudine, longitudine);
             LatLng endPoint = new LatLng(citta.getLatitudine(), citta.getLongitudine());
             line = mMap.addPolyline(new PolylineOptions()
@@ -473,7 +455,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Location end = new Location("");
             end.setLatitude(citta.getLatitudine());
             end.setLongitude(citta.getLongitudine());
-            Log.d("Distance", Double.valueOf(start.distanceTo(end)).toString());
+            Log.d("Distance ", Double.valueOf(start.distanceTo(end)).toString());
+            Log.d("Angle ", Double.valueOf(Math.toDegrees(citta_angolo.second)).toString());
         }
 
     }
