@@ -47,7 +47,6 @@ public class MySQLiteHelper extends SQLiteOpenHelper {
         }
         for (String row : dbString.toString().split(";\n")) {
             if (row != null && row.length() > 0) {
-                Log.d("SQL", row);
                 database.execSQL(row + ";");
             }
         }
@@ -63,7 +62,6 @@ public class MySQLiteHelper extends SQLiteOpenHelper {
 
     public ArrayList<Citta> elencoCitta(String codStato) {
         ArrayList<Citta> citta = new ArrayList<>();
-        Log.d("SAME2", this.toString());
         String qryCitta;
         if (codStato == COUNTRY_CODE_CAPITALI) {
             qryCitta = "SELECT * FROM tblCitta WHERE IsCapitale=1";
@@ -103,7 +101,7 @@ public class MySQLiteHelper extends SQLiteOpenHelper {
         String qry;
         qry = "SELECT tblStato.NomeStato " +
                 "FROM tblStato INNER JOIN tblCitta ON tblStato.IdStato = tblCitta.IdStato " +
-                "WHERE tblCitta.NomeCitta ='"+citta+"'";
+                "WHERE tblCitta.NomeCitta ='" + citta + "'";
         SQLiteDatabase db = getReadableDatabase();
         Cursor cursor = null;
         try {
@@ -119,6 +117,33 @@ public class MySQLiteHelper extends SQLiteOpenHelper {
             cursor.close();
         }
         return "Stato non trovato";
+    }
+
+    public Stato getStatoByCountryCode(String countryCode) {
+        String qry;
+        qry = "SELECT tblStato.* " +
+                "FROM tblStato INNER JOIN tblCitta ON tblStato.IdStato = tblCitta.IdStato " +
+                "WHERE tblStato.CodiceTre ='" + countryCode + "' OR tblStato.CodiceDue='" + countryCode + "'";
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(qry, null);
+            while (cursor.moveToNext()) {
+                Stato stato = new Stato(
+                        cursor.getInt(0),
+                        cursor.getString(1),
+                        cursor.getString(2),
+                        cursor.getString(3),
+                        cursor.getString(4));
+                return stato;
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "Error while trying to get a product from database");
+        }
+        if (cursor != null) {
+            cursor.close();
+        }
+        return null;
     }
 
 

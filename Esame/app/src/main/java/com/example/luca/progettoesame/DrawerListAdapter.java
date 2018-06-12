@@ -14,9 +14,9 @@ import java.util.ArrayList;
 
 public class DrawerListAdapter extends BaseAdapter {
 
-    Context mContext;
-    ArrayList<NavItem> mNavItems;
-    MainActivity mMainActivity;
+    private Context mContext;
+    private ArrayList<NavItem> mNavItems;
+    private MainActivity mMainActivity;
 
     public DrawerListAdapter(Context context, ArrayList<NavItem> navItems, MainActivity mainActivity) {
         mContext = context;
@@ -51,21 +51,14 @@ public class DrawerListAdapter extends BaseAdapter {
             view = convertView;
         }
 
-        TextView titleView = (TextView) view.findViewById(R.id.title);
-        TextView subtitleView = (TextView) view.findViewById(R.id.subTitle);
-        ImageView iconView = (ImageView) view.findViewById(R.id.icon);
+        TextView titleView = view.findViewById(R.id.title);
+        TextView subtitleView = view.findViewById(R.id.subTitle);
+        ImageView iconView = view.findViewById(R.id.icon);
         final NavItem item = mNavItems.get(position);
         titleView.setText( item.mTitle );
         subtitleView.setText( item.mSubtitle );
         iconView.setImageResource(item.mIcon);
-        View.OnClickListener watch = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Log.d("Test", item.mCountryCode);
-
-                mMainActivity.changeCities(item.mCountryCode, mContext);
-            }
-        };
+        View.OnClickListener watch = v -> mMainActivity.changeCities(item.mCountryCode, mContext);
         view.setOnClickListener(watch);
        return view;
     }

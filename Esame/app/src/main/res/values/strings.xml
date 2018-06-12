@@ -9,5 +9,9 @@
     <string name="city_name">Nome città:</string>
     <string name="city_population">Popolazione:</string>
     <string name="city_state">Stato:</string>
+    <string name="cities_state">Città selezionate:</string>
+    <string name="distance_city">Distanza:</string>
+    <string name="angle_city">Angolo:</string>
+    <string name="azimuth_value">Azimuhth:</string>
 
 </resources>

@@ -69,12 +69,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final float DEFAULT_ZOOM = 15f;
 
     private TextView azimuthTv;
-    private TextView GPS;
     private LocationManager locationManager;
     private TextView nome;
     private TextView stato;
     private TextView popolazione;
-
+    private TextView distance;
+    private TextView angle;
 
     float[] gravity = new float[3];
     float[] geomagnetic = new float[3];
@@ -108,7 +108,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         nome = findViewById(R.id.nome);
         stato = findViewById(R.id.stato);
         popolazione = findViewById(R.id.popolazione);
-        GPS = findViewById(R.id.GPS);
+
+        distance = findViewById(R.id.Distance);
+        angle = findViewById(R.id.Angle);
         locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
 
         mNavItems.add(new NavItem("Capitali", "Elenco capitali", R.drawable.onu, MySQLiteHelper.COUNTRY_CODE_CAPITALI));
@@ -129,12 +131,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mDrawerList.setAdapter(adapter);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         // Drawer Item click listeners
-        mDrawerList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                selectItemFromDrawer(position);
-            }
-        });
+        mDrawerList.setOnItemClickListener((parent, view, position, id) -> selectItemFromDrawer(position));
 
         // Define a listener that responds to location updates
         LocationListener locationListener = new LocationListener() {
@@ -142,9 +139,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 // Called when a new location is found by the network location provider.
                 latitudine = location.getLatitude();
                 longitudine = location.getLongitude();
-                GPS.setText(MessageFormat.format("{0}, {1}",
-                        String.valueOf(latitudine),
-                        String.valueOf(longitudine)));
+                location.getBearing();
                 updatePolyline();
             }
 
@@ -162,6 +157,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         checkLocationPermission();
         checkLocationPermission1();
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, locationListener);
 
         mDrawerToggle = new ActionBarDrawerToggle(this, mDrawerLayout, R.drawable.ic_launcher_background, R.string.drawer_open, R.string.drawer_close) {
             @Override
@@ -201,16 +197,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         return mDrawerToggle.onOptionsItemSelected(item) || super.onOptionsItemSelected(item);
     }
 
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case 1: {
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                } else {
-                }
-            }
-        }
-    }
 
     public void checkLocationPermission() {
         String permission = "android.permission.ACCESS_FINE_LOCATION";
@@ -246,7 +232,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .commit();
 
         mDrawerList.setItemChecked(position, true);
-        setTitle(mNavItems.get(position).mTitle);
 
         // Close the drawer
         mDrawerLayout.closeDrawer(mDrawerPane);
@@ -273,7 +258,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             codaAzim.removeLast();
         }
 
-        azimuthTv.setText(azimuthFormat.format(Math.toDegrees(getAzimuth())));
+        azimuthTv.setText(MessageFormat.format("{0} {1}", getString(com.example.luca.progettoesame.R.string.azimuth_value), azimuthFormat.format(Math.toDegrees(getAzimuth()))));
         updatePolyline();
 
     }
@@ -287,7 +272,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             sina += Math.sin(x);
             cosa += Math.cos(x);
         }
-        return (float)Math.atan2(sina,cosa);
+        return (float) Math.atan2(sina, cosa);
     }
 
     @Override
@@ -299,7 +284,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         lat = Math.toRadians(90 - lat);
         longg = Math.toRadians(longg);
         double x = radius * Math.sin(lat) * Math.cos(longg);
-        double y = radius * Math.sin(lat) * Math.cos(longg);
+        double y = radius * Math.sin(lat) * Math.sin(longg);
         double z = radius * Math.cos(lat);
         return new Vector3D(x, y, z);
     }
@@ -314,18 +299,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Vector3D locPos = new Vector3D(-Math.cos(azimuth), Math.sin(azimuth), 0);
             Rotation quat_rot_lat = new Rotation(new Vector3D(0, 1, 0), latitudine);
             Rotation quat_rot_long = new Rotation(new Vector3D(0, 0, 1), longitudine);
-            Vector3D gloDir = quat_rot_long.applyTo(quat_rot_lat.applyTo(locPos));
+            Vector3D gloDir = quat_rot_long.applyTo(quat_rot_lat.applyTo(locPos)).scalarMultiply(user.getNorm());
             Vector3D normUser = Vector3D.crossProduct(user, cityPos);
-            Vector3D normCity = Vector3D.crossProduct(user, gloDir);
-            double angle = Math.abs(Vector3D.angle(normUser, normCity));
-
-            //double angularDistance = new Rotation(cityPos, locPos).getAngle();
+            Vector3D normCity = Vector3D.crossProduct(user, gloDir.add(user));
+            double angle = Vector3D.angle(normUser, normCity);
             if (angle < minAngle) {
                 minAngle = angle;
                 city = x;
             }
         }
-        return new Pair<>(city, (float)minAngle);
+        return new Pair<>(city, (float) minAngle);
     }
 
 
@@ -335,6 +318,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         MySQLiteHelper helper = MySQLiteHelper.getInstance(context);
         Log.d("DB", countryCode);
         cities = helper.elencoCitta(countryCode);
+        Stato stato = MySQLiteHelper.getInstance(context).getStatoByCountryCode(countryCode);
+
+        if(stato != null) {
+            setTitle(MessageFormat.format("{0} {1}", getString(R.string.cities_state), stato.getNomeStato()));
+        } else {
+            setTitle("Capitali");
+        }
+        // Close the drawer
+        if (mDrawerLayout != null) {
+            mDrawerLayout.closeDrawer(mDrawerPane);
+        }
     }
 
     public String getStato(String citta) {
@@ -431,7 +425,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Pair<Citta, Float> citta_angolo = findCity();
         Citta citta = citta_angolo.first;
         if (citta != null && mMap != null && (citta_precedente == null || citta.getIdCitta() != citta_precedente.getIdCitta())) {
-            Log.d("CITTA", citta.toString());
             citta_precedente = citta;
             if (line != null) {
                 line.remove();
@@ -453,9 +446,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Location end = new Location("");
             end.setLatitude(citta.getLatitudine());
             end.setLongitude(citta.getLongitudine());
-            Log.d("Distance ", Double.valueOf(start.distanceTo(end)).toString());
-            Log.d("Angle ", Double.valueOf(Math.toDegrees(citta_angolo.second)).toString());
+            distance.setText(MessageFormat.format(
+                    "{0} {1} km", getString(R.string.distance_city),
+                    start.distanceTo(end)/1000));
         }
+        angle.setText(MessageFormat.format("{0} {1}°", getString(R.string.angle_city), Math.toDegrees(citta_angolo.second)));
 
     }
 }
