@@ -279,7 +279,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     public float getAzimuth() {
-        // Media aritmentica per valoci circolari
+        // Media aritmentica per valori circolari
         // https://en.wikipedia.org/wiki/Mean_of_circular_quantities
         float sina = 0;
         float cosa = 0;
@@ -319,9 +319,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Vector3D normCity = Vector3D.crossProduct(user, gloDir);
             double angle = Math.abs(Vector3D.angle(normUser, normCity));
 
-            //double sin = cityPos.crossProduct(locPos).getNorm()/(cityPos.getNorm()*locPos.getNorm());
-            //double cos = cityPos.dotProduct(locPos)/(cityPos.getNorm()*locPos.getNorm());
-            //double angularDistance = Math.atan2(sin, cos);
+            //double angularDistance = new Rotation(cityPos, locPos).getAngle();
             if (angle < minAngle) {
                 minAngle = angle;
                 city = x;
